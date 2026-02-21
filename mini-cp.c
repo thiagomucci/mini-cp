@@ -7,7 +7,7 @@
 int
 main(int argc, char *argv[])
 {
-	ssize_t n;
+	ssize_t n = 0;
 	char buf[BUFSIZE];
 
 	if(argc != 4)
@@ -32,6 +32,12 @@ main(int argc, char *argv[])
 		exit(1);
 	}
 
+	if(close(dirfd_src))
+  	{
+	perror("close");
+	exit(1);
+  	}
+
 	int dirfd_dstn = open(argv[3], O_RDONLY);
 	if(dirfd_dstn < 0)
 	{
@@ -40,26 +46,52 @@ main(int argc, char *argv[])
 	}
 
 	int fd_dstn = openat(dirfd_dstn, argv[2], O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	if(fd_dstn < 0)
+	{
+		perror("openat");
+		exit(1);
+	}
 
+	if(close(dirfd_dstn))
+ 	{
+	perror("close");
+	exit(1);
+ 	}
 	while((n = read(fd_src, buf, BUFSIZE)) > 0)
 	{
-		if(write(fd_dstn, buf, n) != n)
-		{
-			perror("write");
-			exit(1);
-		}
+	ssize_t t = 0;
+	while (t < n)
+	{
+    ssize_t w = write(fd_dstn, buf + t, n - t);
+    if (w < 0)
+    {
+        perror("write");
+        exit(1);
+    }
+
+    t += w;
 	}
-		if(n < 0)
-		{
-			perror("read");
-			exit(1);
-		}
+	}
+	if(n < 0)
+	{
+		perror("read");
+		exit(1);
+	}
+
+	fdatasync(fd_dstn);
 
 
-	close(fd_dstn);
-	close(dirfd_dstn);
-	close(fd_src);
-	close(dirfd_src);
+	if(close(fd_dstn))
+	{
+		perror("close");
+		exit(1);
+	}
+
+    if(close(fd_src))
+	{
+		perror("close");
+		exit(1);
+	}
 
 	return 0;
 }
